@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kar-Anchor</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            background-color: #222;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #3e8e41;
+        }
+        .result {
+            margin-top: 20px;
+            background-color: #222;
+            padding: 20px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .verify {
+            margin-top: 20px;
+            background-color: #222;
+            padding: 20px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .verify input {
+            width: 100%;
+            height: 100px;
+            background-color: #222;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            font-size: 16px;
+        }
+        .verify button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .verify button:hover {
+            background-color: #3e8e41;
+        }
+    </style>
+</head>
+<body>
+    <h1>Kar-Anchor</h1>
+    <p>A sovereign Merkle anchor for AI-generated content. Commit a batch of text items to ONE Merkle root and publish it anywhere. Each item gets an inclusion proof anyone can re-check offline.</p>
+    <p>Note: A root proves an item was in the committed set and is unaltered; it does not prove authorship or timing unless the root is published somewhere public.</p>
+    <textarea placeholder="Enter content items (one per line)"></textarea>
+    <button onclick="buildMerkleTree()">Anchor</button>
+    <div class="result" id="result"></div>
+    <div class="verify">
+        <h2>Verify</h2>
+        <input type="text" placeholder="Paste item here" id="verifyItem">
+        <input type="text" placeholder="Paste proof here" id="verifyProof">
+        <input type="text" placeholder="Paste root here" id="verifyRoot">
+        <button onclick="verifyProof()">Verify</button>
+        <div id="verifyResult"></div>
+    </div>
+    <script>
+        async function hash(content) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(content);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function padArray(array) {
+            while (array.length % 2 !== 0) {
+                array.push(array[array.length - 1]);
+            }
+            return array;
+        }
+
+        async function buildMerkleTree() {
+            const textItems = document.querySelector('textarea').value.split('\n').filter(item => item.trim() !== '');
+            const itemHashes = await Promise.all(textItems.map(item => hash('leaf:' + item)));
+            const paddedHashes = padArray(itemHashes);
+            let tree = paddedHashes;
+
+            while (tree.length > 1) {
+                const nextLevel = [];
+                for (let i = 0; i < tree.length; i += 2) {
+                    const left = tree[i];
+                    const right = tree[i + 1] || tree[i];
+                    const hashContent = 'node:' + left + ':' + right;
+                    const nodeHash = await hash(hashContent);
+                    nextLevel.push(nodeHash);
+                }
+                tree = nextLevel;
+            }
+
+            const root = tree[0];
+            document.getElementById('result').innerHTML = `Root: ${root}`;
+        }
+
+        async function verifyProof() {
+            const item = document.getElementById('verifyItem').value;
+            const proof = JSON.parse(document.getElementById('verifyProof').value);
+            const root = document.getElementById('verifyRoot').value;
+            let currentHash = await hash('leaf:' + item);
+
+            for (const {hash, side} of proof) {
+                const content = side === 'left' ? 'node:' + hash + ':' + currentHash : 'node:' + currentHash + ':' + hash;
+                currentHash = await hash(content);
+            }
+
+            const result = currentHash === root ? 'VALID' : 'INVALID';
+            document.getElementById('verifyResult').innerHTML = `Proof ${result}`;
+        }
+    </script>
+</body>
+</html>
