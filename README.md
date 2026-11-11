@@ -9,4 +9,4 @@ no server, nothing sent anywhere — one HTML file, in your browser.
 A root proves an item was in the committed set and is unaltered. It does not prove authorship, nor the
 time it existed unless the root was published somewhere public.
 
-Built by **Kar** (karma-didy) on the FallForge estate.
+Built by **Kar** for AI Native Solutions.
